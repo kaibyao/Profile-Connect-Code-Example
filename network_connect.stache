@@ -1,0 +1,130 @@
+[[#lang]] {{! non-admins/owners are never going to see this modal.}}
+<div class="profile-connect-header">
+	<h2 class="profile-connect-title half font-16">[[connect_network]]</h2>
+	{{#showGroupSelector}}
+	<div class="profile-connect-groups half ui-dark">
+		<em>in group</em>
+		<select class="profile-connect-groupselect groups-menu" data-pollinator-event="select_group" data-pollinator-trigger="change">
+			{{#customergroups}}
+				<optgroup label="{{customerName}}">
+					{{#groups}}
+						<option value="{{id}}" {{#is_personal}}class='personal'{{/is_personal}} {{#selected}}selected="selected" aria-selected='true'{{/selected}}{{^selected}}aria-selected="false"{{/selected}}  data-url="[[img_cdn]]/{{#is_personal}}lock-personal-larger.png{{/is_personal}}{{^is_personal}}grp-star-{{icon_color}}.png{{/is_personal}}" {{#is_personal}}data-personal="true"{{/is_personal}}>{{name}}</option>
+					{{/groups}}
+				</optgroup>
+			{{/customergroups}}
+		</select>
+	</div>
+	{{/showGroupSelector}}
+</div>
+
+<nav id="profile-connect-profiles" class="has-google-plus{{#hasGoogleAnalytics}} has-google-analytics{{/hasGoogleAnalytics}}">
+	<a class="profile-connect-profile twitter" href="javascript:void(0);" data-type="twitter" data-pollinator-event="connect_twitter" data-pollinator-trigger="click">
+		<span class="profile-connect-icon">[[twitter]]</span>
+		<span class="profile-connect-profile-name">[[twitter]]</span>
+	</a>
+
+	<a class="profile-connect-profile facebook" href="javascript:void(0);" data-type="facebook" data-pollinator-event="connect_facebook" data-pollinator-trigger="click">
+		<span class="profile-connect-icon">[[facebook]]</span>
+		<span class="profile-connect-profile-name">[[facebook]]</span>
+	</a>
+
+	<a class="profile-connect-profile googleplus gplus" href="javascript:void(0);" data-type="gplus" data-pollinator-event="connect_gplus" data-pollinator-trigger="click">
+		<span class="profile-connect-icon">[[googleplus]]</span>
+		<span class="profile-connect-profile-name">[[googleplus]]</span>
+	</a>
+
+	<a class="profile-connect-profile linkedin" href="javascript:void(0);" data-type="linkedin" data-pollinator-event="connect_linkedin" data-pollinator-trigger="click">
+		<span class="profile-connect-icon">[[linkedin]]</span>
+		<span class="profile-connect-profile-name">[[linkedin]]</span>
+	</a>
+
+	{{#hasGoogleAnalytics}}
+	<a class="profile-connect-profile google_analytics_website" href="javascript:void(0);" data-type="google_analytics_website" data-pollinator-event="connect_google_analytics" data-pollinator-trigger="click">
+		<span class="profile-connect-icon">[[ga]]</span>
+		<span class="profile-connect-profile-name">[[ga]]</span>
+	</a>
+	{{/hasGoogleAnalytics}}
+
+	{{#hasOnlyGoogleReader}}
+	<a class="profile-connect-profile googlereader" href="javascript:void(0);" data-type="rssreader">
+		<span class="profile-connect-icon">[[google_reader]]</span>
+		<span class="profile-connect-profile-name">[[google_reader]]</span>
+	</a>
+	{{/hasOnlyGoogleReader}}
+
+	{{^hasOnlyGoogleReader}}
+	<a class="profile-connect-profile rssreader" href="javascript:void(0);" data-type="rssreader" data-pollinator-event="connect_rss" data-pollinator-trigger="click">
+		<span class="profile-connect-icon">[[rss_reader]]</span>
+		<span class="profile-connect-profile-name">[[rss_reader]]</span>
+	</a>
+	{{/hasOnlyGoogleReader}}
+</nav>
+
+<div id="profile-connect-description-container"></div>
+
+<div class="profile-connect-footer">
+	<div class="profile-connect-footer-msg restricted" style="{{^numProfilesAvailable}}display: none;{{/numProfilesAvailable}}">
+
+		 {{!
+		 	To avoid confusion, variable definitions:
+		 	upgradePlan = has hit profile limit, show different text for true vs false
+		 	canUpgradePlan = is Premium plan or not, show contact us modal link or upgrade plan link
+		 }}
+
+		{{#upgradePlan}}
+			[[profile_connect_num_available_upgrade]]
+			{{#canUpgradePlan}} <a href="/settings/billing/planselection/update/" class="upgrade" data-pollinator-event="upgrade_hit_limit" data-pollinator-trigger="click">[[profile_connect_upgrade_today]]</a>{{/canUpgradePlan}}
+			{{^canUpgradePlan}} <a href="javascript:void(0)" class="js-contact-plug upgrade" data-pollinator-event="contact_to_upgrade_hit_limit" data-pollinator-trigger="click">[[profile_connect_contact_us]]</a>{{/canUpgradePlan}}
+
+		{{/upgradePlan}}
+
+		{{^upgradePlan}}
+			[[profile_connect_num_available]]
+			{{#canUpgradePlan}} <a href="/settings/billing/planselection/update/" class="upgrade" data-pollinator-event="upgrade_below_limit" data-pollinator-trigger="click">[[profile_connect_upgrade_today]]</a>{{/canUpgradePlan}}
+			{{^canUpgradePlan}} <a href="javascript:void(0)" class="js-contact-plug upgrade" data-pollinator-event="contact_to_upgrade_below_limit" data-pollinator-trigger="click">[[profile_connect_contact_us]]</a>{{/canUpgradePlan}}
+		{{/upgradePlan}}
+	</div>
+
+	<div class="profile-connect-footer-msg unlimited" style="{{#numProfilesAvailable}}display: none;{{/numProfilesAvailable}}">
+		[[profile_connect_no_limit]]
+	</div>
+
+	<div id="profile-connect-footer-buttons">
+		<a class="profile-connect-cancel profile-connect-link" href="javascript:void(0);" data-pollinator-event="cancel" data-pollinator-trigger="click">[[btn_cancel]]</a>
+
+		<span class="profile-connect-proceed-container" style="{{^add}}display:none;{{/add}}">
+			or
+			<a class="profile-connect-proceed button primary proxima disabled" href="javascript:void(0);" data-pollinator-event="proceed" data-pollinator-trigger="click">
+				<span class="profile-connect-proceed-text">[[proceed_btn]]</span>
+				<img class="loader" src="[[img_cdn]]/loader-greenbutton-white.gif">
+			</a>
+		</span>
+
+		<a class="profile-connect-done button primary proxima" href="javascript:void(0);" data-pollinator-event="done" data-pollinator-trigger="click">[[btn_done]]</a>
+	</div>
+</div>
+
+{{#loading}}
+<div class="profile-connect-loading">
+	{{^hasError}}
+	<img class="loader" src="[[img_cdn]]/loader-darkmodal-silver-2.gif" alt="">
+	{{/hasError}}
+	{{#hasError}}
+	<div class="profile-connect-loading-error">
+		<h3 class="profile-connect-title">[[profile_connect_error_message]]</h3>
+		<p class="profile-connect-success-text actions">
+			<a class="profile-connect-retry profile-connect-link" href="javascript:void(0);" data-pollinator-event="error_retry" data-pollinator-trigger="click">
+				[[retry]]
+			</a>
+			<span class="profile-connect-or">
+				[[or]]
+			</span>
+			<a class="profile-connect-cancel profile-connect-link" href="javascript:void(0);" data-pollinator-event="error_cancel" data-pollinator-trigger="click">
+				[[btn_cancel]]
+			</a>
+		</p>
+	</div>
+	{{/hasError}}
+</div>
+{{/loading}}
+[[/lang]]

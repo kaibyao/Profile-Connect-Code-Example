@@ -1,0 +1,489 @@
+(function() {
+	var t, $el, stubNetworkConnect;
+
+module( 'networkConnect', {
+	setup : function() {
+		t = tester.networkConnect;
+		$el = {
+			find : function() { return $el; },
+			empty : function() { return $el; },
+			append : function() { return $el; },
+			addClass : function() { return $el; },
+			removeClass : function() { return $el; },
+			siblings : function() { return $el; },
+			attr : function() { return $el; }
+		};
+		// no easy way to use sinon to stub an object and it's methods that I have found yet. This is the next best solution
+		stubNetworkConnect = $.extend(true,{},Ss.networkConnect);
+		Ss.networkConnect = {
+			app : {
+				selected : {},
+				modalRouter : function() {},
+				groupProfilesCollection : {
+					add : function() {},
+					where : function() { return []; }
+				},
+				profileSelectCollection : {
+					where : function() { return []; }
+				},
+				initSelect : function() {}
+			},
+			models : {}
+		};
+	},
+	teardown : function() {
+		t = null; $el = null;
+		Ss.networkConnect = stubNetworkConnect;
+	}
+} );
+
+test( 'initModalFor', 6, function() {
+	var groupId = 1,
+		profileType = 'twitter',
+		action,
+		profileVars = {};
+
+	t.initModalFor( groupId, profileType, action, profileVars );
+	equal( Ss.networkConnect.app.selected.action, 'add', 'action defaults to "add" when not provided.' );
+	equal( Ss.networkConnect.app.selected.facebookType, 'page', 'facebook type defaults to "page" when not provided.' );
+	equal( Ss.networkConnect.app.selected.profileType, profileType, 'profileType is set to the provided profileType when not facebook.' );
+
+	action = 'select';
+	profileType = 'facebook_profile';
+	t.initModalFor( groupId, profileType, action, profileVars );
+	equal( Ss.networkConnect.app.selected.action, action, 'action is set to provided action when provided.' );
+	equal( Ss.networkConnect.app.selected.facebookType, 'profile', 'facebook type set to "profile" when profileType is "facebook_profile".' );
+	equal( Ss.networkConnect.app.selected.profileType, 'facebook', 'profileType is set to facebook when profileType is a type of facebook profile.' );
+} );
+
+test( 'modalRouter', 3, function() {
+	var groupId = 1,
+		profileVars = {},
+		groupObj = { set : function() { return groupObj; }, trigger : function() { return groupObj; }, getData : function() {}, resetData : function() { return groupObj; } },
+		app = Ss.networkConnect.app;
+	app.groupProfilesCollection.where = function() { return [ groupObj ]; };
+
+	app.selected.action = 'select';
+	app.handleProfileConnectSelect = function() { ok( true, 'calls function to handle profile select when action is select.' ); return groupObj; };
+	t.modalRouter( groupId, profileVars );
+
+	app.selected.action = 'success';
+	app.handleProfileConnectSuccess = function() { ok( true, 'calls function to handle profile success when action is success.' ); };
+	t.modalRouter( groupId, profileVars );
+
+	app.selected.action = 'add';
+	t.modalRouter( groupId, profileVars );
+	equal( app.selected.profileData, undefined, 'sets profile data to undefined when adding a profile.' );
+} );
+
+test( 'handleProfileConnectSelect', 4, function() {
+	var groupId = 1,
+		profileVars = {},
+		groupObj = { set : function() { return groupObj; }, trigger : function() { return groupObj; }, getData : function() {}, resetData : function() { return groupObj; } },
+		app = Ss.networkConnect.app;
+	app.groupProfilesCollection.where = function() { return [ groupObj ]; };
+
+	profileVars.isNewGroup = true;
+	Ss.networkConnect.models.groupProfile = function() { ok( true, 'new group created when adding a group.'); return groupObj; };
+	app.groupProfilesCollection.add = function() { ok( true, 'newly created group added to collection.' ); };
+
+	app.selected.profileType = 'facebook';
+	app.selected.facebookType = 'page';
+	app.parseFacebookPageDataForGroup = function() { ok( true, 'initializes facebook select data when facebook parameters correctly assigned.' ); };
+	t.handleProfileConnectSelect( groupId, profileVars, groupObj );
+
+	app.groupProfilesCollection.add = Ss.networkConnect.models.groupProfile = function() { ok( false, 'should not be called when not a new group.' ); };
+	profileVars.isNewGroup = false;
+
+	app.selected.profileType = 'google_analytics_website';
+	app.parseGoogleAnalyticsDataForGroup = function() { ok( true, 'initializes google analytics data when profile type is google analytics.' ); };
+	t.handleProfileConnectSelect( groupId, profileVars, groupObj );
+} );
+
+test( 'handleProfileConnectSuccess', 2, function() {
+	var profileVars = {},
+		groupObj = { set : function() { return groupObj; }, trigger : function() { return groupObj; }, getData : function() {}, resetData : function() { return groupObj; } },
+		app = Ss.networkConnect.app;
+
+	app.selected.profileType = 'rssreader';
+
+	t.handleProfileConnectSuccess( groupObj, profileVars );
+	equal( app.selected.profileData, null, 'sets profile data to null when profile type is google reader and success state.' );
+
+	app.selected.profileType = 'twitter';
+	groupObj.get = function() { return [ { id : 2 } ]; };
+	profileVars = [ 2 ];
+	t.handleProfileConnectSuccess( groupObj, profileVars );
+	deepEqual( app.selected.profileData, { numProfiles : 1, data : [ { id : 2 } ] }, 'assigns the correct object when profile type is not google reader and action is success.' );
+} );
+
+test( 'profileSelectView::render', 3, function() {
+	var stache = {},
+		tempThis = { $el : $el, model : { toJSON : function() { return stache; } } };
+	var templateStub = sinon.stub(Ss,"template", function() { return function() {}; });
+	Ss.networkConnect.app.profileSelectModalView = { $el : { find : function() {} } };
+
+	Ss.networkConnect.app.selected.profileType = 'twitter';
+	stache.connected = true;
+	$el.parent = function() { return []; };
+	$el.addClass = function( cssClass ) { equal( cssClass, 'disabled', 'disables view when profile already connected to group.' ); };
+	$el.removeClass = function() { ok( false, 'should not be called.' ); };
+	$el.appendTo = function() { ok( true, 'appends view when not in DOM.' ); };
+	t.profileSelectViewCore.render.call( tempThis );
+
+	stache.connected = false;
+	$el.parent = function() { return [ 1 ]; };
+	$el.addClass = function() { ok( false, 'should not be called.' ); };
+	$el.removeClass = function( cssClass ) { equal( cssClass, 'disabled', 'enables view when profile not connected to group.' ); };
+	$el.appendTo = function() { ok( false, 'should not append view when already in DOM.' ); };
+	t.profileSelectViewCore.render.call( tempThis );
+	templateStub.restore();
+} );
+
+test( 'profileSelectView::toggleSelect', 5, function() {
+	var tempThis = { model : { collection : { where : function() {} } } },
+		ev = { preventDefault : function() {} };
+	Ss.networkConnect.app.profileSelectModalView = {};
+
+	tempThis.model.get = function( attr ) { return true; } // connected
+	Ss.networkConnect.app.profileSelectModalView.getNumberCurrentlyAvailableProfiles = function() { return false; };
+	equal( t.profileSelectViewCore.toggleSelect.call( tempThis, ev ), false, 'does nothing if profile already connected.' );
+
+	Ss.networkConnect.app.profileSelectModalView.getNumberCurrentlyAvailableProfiles = function() { return false; };
+	tempThis.model.get = function( attr ) { if ( attr === 'connected' ) return false; else return false; }; // selected
+	Ss.networkConnect.app.profileSelectModalView.errorFooterMessage = function() { ok( false, 'should not be called.' ); };
+	tempThis.model.set = function() { ok( true, 'allows selection when number of available of profiles is not set.' ); };
+	t.profileSelectViewCore.toggleSelect.call( tempThis, ev );
+
+	Ss.networkConnect.app.profileSelectModalView.getNumberCurrentlyAvailableProfiles = function() { return 1; };
+	tempThis.model.set = function() { ok( true, 'allows selection when number of available of profiles is > 0.' ); };
+	t.profileSelectViewCore.toggleSelect.call( tempThis, ev );
+
+	Ss.networkConnect.app.profileSelectModalView.getNumberCurrentlyAvailableProfiles = function() { return 0; };
+	tempThis.model.get = function( attr ) { if ( attr === 'connected' ) return false; else return true; }; // selected
+	tempThis.model.set = function() { ok( true, 'allows deselection when number of available of profiles is 0 and profile is currently selected.' ); };
+	t.profileSelectViewCore.toggleSelect.call( tempThis, ev );
+
+	tempThis.model.get = function( attr ) { if ( attr === 'connected' ) return false; else return false; }; // selected
+	tempThis.model.set = function() { ok( false, 'should not allow toggling when there are 0 profiles available and the current view is not selected.' ); };
+	Ss.networkConnect.app.profileSelectModalView.errorFooterMessage = function() { ok( true, 'shows an error footer message when there are 0 profiles available and current view is not selected.' ); };
+	t.profileSelectViewCore.toggleSelect.call( tempThis, ev );
+} );
+
+test( 'profileSelectModalView::render', 2, function() {
+	var group = { toJSON : function() {} },
+        tempThis = { $el : $el, trigger : function() {}, dialogWrap : function() {}, collection : { find : function() { return group; } } };
+
+	Ss.networkConnect.app.selected.profileType = 'twitter';
+	var templateStub = sinon.stub(Ss,"template", function() { return function() {}; });
+
+	Ss.networkConnect.app.selected.action = 'add';
+    group.toJSON = function() { ok( false, 'nothing should happen when action is not select.' ); };
+    t.profileSelectModalViewCore.render.call( tempThis );
+
+    Ss.networkConnect.app.selected.action = 'success';
+    t.profileSelectModalViewCore.render.call( tempThis );
+
+    Ss.networkConnect.app.selected.action = 'select';
+    Ss.networkConnect.app.profileSelectCollection.models = [];
+    Ss.networkConnect.app.profileSelectCollection.renderCollection = function() {};
+    group.toJSON = function() { return {}; };
+
+    templateStub.restore();
+    templateStub = sinon.stub(Ss,"template", function() {
+		return function( stache ) {
+			equal( stache.noProfilesToConnect, true, 'renders no profiles to connect view when there are no profiles found.' );
+		};
+    });
+
+    Ss.networkConnect.app.selected.profileData = {};
+    templateStub.restore();
+    templateStub = sinon.stub(Ss,"template", function() {
+		return function( stache ) {
+			equal( stache.grantedPermissions, true, 'grantedPermissions is true if profileData.data.granted_permissions is undefined.' );
+		};
+    });
+
+    Ss.networkConnect.app.selected.profileData.granted_permissions = false;
+    templateStub.restore();
+    templateStub = sinon.stub(Ss,"template", function() {
+		return function( stache ) {
+			equal( stache.grantedPermissions, false, 'renders warning about granting facebook permissions.' );
+		};
+    });
+
+    tempThis.dialogWrap = function() { ok( true, 'renders only when action = select.' ); };
+    t.profileSelectModalViewCore.render.call( tempThis );
+
+	templateStub.restore();
+} );
+
+test( 'profileSelectModalView::updateButtonDisplay', 2, function() {
+	var profiles = [],
+		tempThis = { $el : $el };
+
+	profiles = [ 1 ];
+	$el.addClass = function() { ok( false, 'should not be called.' ); };
+	$el.removeClass = function( cssClass ) { equal( cssClass, 'disabled', 'enables button when 1 or more profiles selected.' ); };
+	t.profileSelectModalViewCore.updateButtonDisplay.call( tempThis, profiles );
+
+	profiles = [];
+	$el.addClass = function( cssClass ) { equal( cssClass, 'disabled', 'disables button when 0 profiles selected.' ); };
+	$el.removeClass = function() { ok( false, 'should not be called.' ); };
+	t.profileSelectModalViewCore.updateButtonDisplay.call( tempThis, profiles );
+} );
+
+test( 'profileSelectModalView::getNumberCurrentlyAvailableProfiles', 2, function() {
+	var group = {},
+		tempThis = { collection : { where : function() { return [ group ]; } } },
+		profiles = [];
+
+	group.get = function() { return undefined; }; // numProfilesAvailable
+	equal( t.profileSelectModalViewCore.getNumberCurrentlyAvailableProfiles.call( tempThis, profiles ), false, 'returns false when there is no set number of currently available profiles.' );
+
+	group.get = function() { return 5; }; // numProfilesAvailable
+	profiles = [ 1, 2 ];
+	equal( t.profileSelectModalViewCore.getNumberCurrentlyAvailableProfiles.call( tempThis, profiles ), 3, 'correctly calculates number of available profiles after taking selected profiles into account.' );
+} );
+
+test( 'profileSelectModalView::connectProfiles', 2, function() {
+	var ev = { preventDefault : function() {} },
+		tempThis = { $el : $el };
+
+	$el.find = function() { ok( false, 'should not proceed if there are no selected profiles.' ); }
+	t.profileSelectModalViewCore.connectProfiles.call( tempThis, ev );
+
+	$el.find = function() { return $el; }
+	Ss.networkConnect.app.profileSelectCollection.where = function() { return [ 1 ]; };
+
+	tempThis.connectFacebookProfiles = function() { ok( false, 'should not be called when type is not facebook.' ); };
+	tempThis.connectGoogleAnalyticsProfiles = function() { ok( false, 'should not be called when type is not google analytics.' ); };
+	t.profileSelectModalViewCore.connectProfiles.call( tempThis, ev );
+
+	Ss.networkConnect.app.selected.profileType = 'facebook';
+	tempThis.connectFacebookProfiles = function() { ok( true, 'connects selected facebook profiles when profile type is facebook.' ); };
+	t.profileSelectModalViewCore.connectProfiles.call( tempThis, ev );
+
+	Ss.networkConnect.app.selected.profileType = 'google_analytics_website';
+	tempThis.connectFacebookProfiles = function() { ok( false, 'should not be called when type is not facebook.' ); };
+	tempThis.connectGoogleAnalyticsProfiles = function() { ok( true, 'connects selected facebook profiles when profile type is google analytics.' ); };
+	t.profileSelectModalViewCore.connectProfiles.call( tempThis, ev );
+} );
+
+test( 'groupProfileConnectModalView::generateTemplateVarsFor',9, function() {
+	var tempThis = { generateCustomergroupsTemplateVar : function() {} },
+		data = {},
+		group = { toJSON : function() { return data; }, isReaderStillGoogle : function() { return true; } },
+		stache;
+	Ss.networkConnect.app.selected.action = 'add';
+
+	group.isRetrievingDataFromAPI = false;
+	data.data = undefined;
+	stache = t.groupProfileConnectModalViewCore.generateTemplateVarsFor.call( tempThis, group );
+	equal( stache.loading, true, 'renders loader when there is no API data.' );
+	equal( stache.numProfilesAvailable, undefined, 'does not render number of available profiles when data not available from API.' );
+
+	data.data = { restricted : { total_available : 5}, plans : { description: 'Premium Plan' } };
+	group.isRetrievingDataFromAPI = true;
+	stache = t.groupProfileConnectModalViewCore.generateTemplateVarsFor.call( tempThis, group );
+	equal( stache.loading, true, 'renders loader when retrieving data from API.' );
+	equal( stache.upgradePlan, false, 'does not flag account for upgrade when there are more than 0 available profiles.');
+
+	group.isRetrievingDataFromAPI = false;
+	data.data.restricted.total_available = undefined;
+	stache = t.groupProfileConnectModalViewCore.generateTemplateVarsFor.call( tempThis, group );
+	equal( stache.loading, false, 'does not render loader when not retrieving data from API and data is available.' );
+	equal( stache.numProfilesAvailable, data.data.restricted.total_available, 'correctly sets the number of available of profiles.' );
+	equal( stache.upgradePlan, false, 'does not flag account for upgrade when total_available is not set.');
+
+	data.data.plans.description = 'Not Premium Plan Version 3433333';
+	stache = t.groupProfileConnectModalViewCore.generateTemplateVarsFor.call( tempThis, group );
+	equal( stache.upgradePlan, false, 'flags account for upgrade when there are 0 or less profiles available.');
+	equal( stache.canUpgradePlan, true, 'shows upgrade link when user is not on premium plan');
+
+} );
+
+test( 'groupProfileConnectModalView::render', 2, function() {
+	var group = {},
+		tempThis = { $el : $el, generateTemplateVarsFor : function() {}, trigger : function() {}, dialogWrap : function() {}, renderGroupSelector : function() { return tempThis; } };
+
+	var templateStub = sinon.stub(Ss, "template", function() { return function() {}; });
+
+	Ss.networkConnect.app.selected.action = 'select';
+	t.groupProfileConnectModalViewCore.render.call( tempThis, group ); // nothing happens
+
+	Ss.networkConnect.app.selected.action = 'success';
+	Ss.networkConnect.app.selected.profileType = 'twitter';
+	group.get = function( attr ) { return ( attr === 'apiError' ) ? true : {}; };
+	tempThis.updateViewElementsForProfile = function() { ok( false, 'Should not update elements when action is success but there is an api error.' ); };
+	t.groupProfileConnectModalViewCore.render.call( tempThis, group );
+
+	group.get = function( attr ) { return ( attr === 'apiError' ) ? false : {}; };
+	tempThis.updateViewElementsForProfile = function() { ok( true, 'Updates elements when action is success.' ); };
+	t.groupProfileConnectModalViewCore.render.call( tempThis, group );
+
+	Ss.networkConnect.app.selected.action = 'add';
+	Ss.networkConnect.app.selected.profileType = undefined;
+	tempThis.updateViewElementsForProfile = function() { ok( false, 'should not be called when adding a profile and there is a selected profile type.' ); };
+	t.groupProfileConnectModalViewCore.render.call( tempThis, group );
+
+	// group.get = function() { return undefined; };
+	// tempThis.updateViewElementsForProfile = function() { ok( false, 'nothing should happen when adding a profile and there is no data.' ); };
+	// t.groupProfileConnectModalViewCore.render.call( tempThis, group );
+
+	Ss.networkConnect.app.selected.profileType = 'twitter';
+	tempThis.updateViewElementsForProfile = function() { ok( false, 'nothing should happen when adding a profile and there is no selected profile type.' ); };
+	tempThis.activateProfile = function() { ok( true, 'activates profile when adding a profile and there is a selected profile type.' ); };
+	t.groupProfileConnectModalViewCore.render.call( tempThis, group );
+
+	templateStub.restore();
+} );
+
+test( 'groupProfileConnectModalView::getRedirectUrl', 1, function() {
+	var modelAttr = { data : {} },
+		tempModel = { toJSON : function() { return modelAttr; } },
+		tempThis = { collection : {} };
+
+	tempThis.collection.where = function() { return [ tempModel ] };
+	Ss.networkConnect.app.restrictedProfiles = [];
+	Ss.networkConnect.app.selected.profileType = 'google_analytics_website';
+	modelAttr.data.google_analytics = { href : 'test' };
+	equal( t.groupProfileConnectModalViewCore.getRedirectUrl.call( tempThis ), '/test', 'adds a trailing slash in front of url if it is missing.' );
+} );
+
+test( 'groupProfileConnectModalView::dialogWrap', 2, function() {
+	var tempThis = { $el : $el, renderDialogOverlay : function() {} };
+
+	$el.parent = function() { return []; };
+	$el.dialog = function( options ) { equal( typeof( options ), 'object', 'initializies dialog with options when there is no parent element for modal view.' ); };
+	t.groupProfileConnectModalViewCore.dialogWrap.call( tempThis );
+
+	$el.parent = function() { return [ 1 ]; };
+	$el.dialog = function( options ) { if ( options === 'isOpen' ) { return false; } else if ( options === 'open' ) { ok( true, 'reopens dialog when parent already exists and the modal is not already open.' ); } };
+	t.groupProfileConnectModalViewCore.dialogWrap.call( tempThis );
+
+	$el.dialog = function( options ) { if ( options === 'isOpen' ) { return true; } else if ( options === 'open' ) { ok( false, 'nothing should happen when dialog already open.' ); } };
+	t.groupProfileConnectModalViewCore.dialogWrap.call( tempThis );
+} );
+
+test( 'groupProfileConnectModalView::activateProfile', 1, function() {
+	var tempThis = { collection : { where : function() { return []; } }, updateViewElementsForProfile : function() { return tempThis; }, trigger : function() {} },
+		$target = $el;
+
+	Ss.networkConnect.app.selected.profileData = 1;
+	t.groupProfileConnectModalViewCore.activateProfile.call( tempThis, $target, 'twitter' );
+	equal( Ss.networkConnect.app.selected.profileData, undefined, 'unsets profile data when activating profile type.' );
+} );
+
+test( 'connectModalDescriptionBoxView::generateTemplateVars', 8, function() {
+	var tempThis = { $el : $el, fillGoogleReaderTemplateVars : function() {} },
+		data = {},
+		group = { toJSON : function() { return data; } },
+		stache;
+	Ss.networkConnect.app.groupProfilesCollection.where = function() { return [ group ]; };
+	Ss.networkConnect.app.selected.action = 'add';
+	Ss.networkConnect.app.selected.facebookType = 'page';
+
+	Ss.networkConnect.app.selected.profileType = undefined;
+
+	data.data = { restricted : { total_available : 0 } };
+	data.role = 'owner';
+	stache = t.connectModalDescriptionBoxViewCore.generateTemplateVars.call( tempThis );
+	ok( stache.upgradePlan, 'renders upgrade plan language when there are 0 total available profiles.' );
+	ok( stache.isOwner, 'uses owner language when user is the account owner.' );
+	ok( stache.defaultMessage, 'uses default message when no profile type selected.' );
+
+	data.role = 'default';
+	stache = t.connectModalDescriptionBoxViewCore.generateTemplateVars.call( tempThis );
+	equal( stache.isOwner, false, 'uses non-owner language when user is not the account owner.' );
+
+	Ss.networkConnect.app.selected.profileType = 'twitter';
+	Ss.networkConnect.app.selected.profileData = { blah : true, data : [ { blah2 : true } ] };
+	data.data = { restricted : { total_available : 1 } };
+	stache = t.connectModalDescriptionBoxViewCore.generateTemplateVars.call( tempThis );
+	equal( stache.upgradePlan, false, 'renders normal language when there are >0 total available profiles.' );
+	ok( stache.twitter, 'uses selected profile type\'s language.' );
+	ok( stache.blah2, 'merges profile data\'s api variables.' );
+
+
+	Ss.networkConnect.app.selected.profileType = 'facebook';
+	Ss.networkConnect.app.selected.facebookType = 'page';
+	stache = t.connectModalDescriptionBoxViewCore.generateTemplateVars.call( tempThis );
+	ok( stache.blah, 'merges all profile data.' );
+} );
+
+test( 'connectModalDescriptionBoxView::fillGoogleReaderTemplateVars', 2, function() {
+	var stache = {},
+		data = {};
+
+	Ss.networkConnect.app.selected.profileType = 'twitter';
+	t.connectModalDescriptionBoxViewCore.fillGoogleReaderTemplateVars( stache, data );
+	equal( stache.email, undefined, 'does not set google reader variables if selected profile type is not google reader.' );
+
+	Ss.networkConnect.app.selected.profileType = 'rssreader';
+
+	t.connectModalDescriptionBoxViewCore.fillGoogleReaderTemplateVars( stache, data );
+	equal( stache.alreadyConnected, false, 'does not set google reader variables if there is no reader api data.' );
+} );
+
+test( 'groupProfileModel::isProfileAddableToGroup', 6, function() {
+	var data = undefined,
+		readerData = {},
+		tempThis = { get : function( attr ) { return attr === 'data' ? data : readerData; } };
+
+	Ss.networkConnect.app.selected.profileType = undefined;
+	equal( t.groupProfileModelCore.isProfileAddableToGroup.call( tempThis ), false, 'cannot add a profile when there is no api data retrieved.' );
+
+	Ss.networkConnect.app.selected.profileType = 'twitter';
+	Ss.networkConnect.app.restrictedProfiles = [ 'twitter' ];
+	data = { restricted : { total_available : 0 } };
+	equal( t.groupProfileModelCore.isProfileAddableToGroup.call( tempThis ), false, 'cannot add a profile when there are no profiles available.' );
+
+	data.restricted.total_available = 1;
+	equal( t.groupProfileModelCore.isProfileAddableToGroup.call( tempThis ), true, 'can add a profile when there are profiles available.' );
+
+	Ss.networkConnect.app.selected.profileType = 'rssreader';
+
+	equal( t.groupProfileModelCore.isProfileAddableToGroup.call( tempThis ), true, 'can add a profile when rssreader selected and there is no rss reader api data.' );
+
+	readerData.email = 'test';
+	equal( t.groupProfileModelCore.isProfileAddableToGroup.call( tempThis ), false, 'cannot add a profile when rssreader selected and there is already rss reader api data.' );
+
+	Ss.networkConnect.app.selected.profileType = 'google_analytics_website';
+	equal( t.groupProfileModelCore.isProfileAddableToGroup.call( tempThis ), true, 'can add a profile when google analytics selected.' );
+} );
+
+test( 'groupProfileModel::isReaderStillGoogle', 3, function() {
+	var tempThis = { get : function() { return data; } },
+		data = undefined;
+
+	data = undefined;
+	equal( t.groupProfileModelCore.isReaderStillGoogle.call( tempThis ), false, 'returns false when no API data.' );
+
+	data = { type : 'feedly' };
+	equal( t.groupProfileModelCore.isReaderStillGoogle.call( tempThis ), false, 'returns false when reader API returned type is not google.' );
+
+	data = { type : 'google' };
+	equal( t.groupProfileModelCore.isReaderStillGoogle.call( tempThis ), true, 'returns true when reader API returned type is google.' );
+} );
+
+test( 'groupProfileModel::ensureApisRespond', 1, function() {
+	var promise = {},
+		apiData = {};
+
+	promise.resolve = function() { ok( false, 'should not resolve when both api and reader-api data are not finished.' ); };
+
+	apiData.data = true;
+	apiData.reader_data = false;
+	t.groupProfileModelCore.ensureApisRespond( promise, apiData );
+
+	apiData.data = false;
+	apiData.reader_data = true;
+	t.groupProfileModelCore.ensureApisRespond( promise, apiData );
+
+	apiData.data = true;
+	apiData.reader_data = true;
+	promise.resolve = function() { ok( true, 'Resolves when both api and reader-api data are finished.' ); };
+	t.groupProfileModelCore.ensureApisRespond( promise, apiData );
+} );
+})();
